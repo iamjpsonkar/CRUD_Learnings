@@ -48,10 +48,7 @@ DELETE /api/resource/{id}
 
 **Let's create a complete Book Management System | BMS**
 
-# Lecture 1: Introduction to Flask
-
-## Overview
-Welcome to the Python Course on Building a Book Management System using Flask! In this first lecture, we'll introduce Flask, a micro web framework for Python, and set the stage for our exciting journey in developing a Book Management System.
+# Introduction to Flask
 
 ### What is Flask?
 Flask is a lightweight and easy-to-extend web framework for Python. It provides the essentials for building web applications without imposing too many constraints. Its simplicity makes it an excellent choice for beginners while offering flexibility for more advanced users.
@@ -70,9 +67,6 @@ Web frameworks provide a structured way to build web applications. They offer to
 ### Flask vs. Other Web Frameworks
 While there are several web frameworks available for Python (Django, Pyramid, etc.), Flask stands out for its simplicity and flexibility. It doesn't enforce a particular way of doing things, allowing developers to make choices based on their preferences and project requirements.
 
-## Setting Expectations for Our Project
-Now that we've introduced Flask, let's discuss what we aim to achieve in this course.
-
 ### Book Management System
 Our project will be a Book Management System (BMS) where users can:
 - View a list of books
@@ -80,22 +74,12 @@ Our project will be a Book Management System (BMS) where users can:
 - Update book information
 - Delete books
 
-### Course Structure
-We'll cover Flask fundamentals, database modeling, user authentication, and more. Each lecture will focus on a specific aspect of our project, gradually building the Book Management System from the ground up.
-
-## Next Steps
-In the next lecture, we'll dive into setting up our development environment, ensuring you have everything you need to get started. If you haven't already, make sure to have Python and a virtual environment installed on your machine.
-
-Get ready to embark on this exciting journey into web development with Flask! If you have any questions, feel free to ask in the discussion forum. Happy coding!
-
 ## Setting Up the Development Environment
 
-### Overview
-Welcome back! In this lecture, we'll dive into setting up the development environment for our Flask project. Having the right tools and a clean environment is crucial for a smooth development process.
-
 #### Prerequisites
-Before we begin, ensure you have the following installed on your machine:
+
 - [Python](https://www.python.org/downloads/)
+
 - [Virtualenv](https://virtualenv.pypa.io/en/latest/installation.html) (for creating isolated Python environments)
 
 ## Initializing a Flask Project
@@ -861,6 +845,248 @@ with app.app_context():
 
 
 app.add_url_rule("/<int:book_id>", view_func=BookView.as_view("BMS"), methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+
+## Authentication and Authorization
+
+### Authentication
+
+*Authentication is the process of verifying the identity of a user or system. In Flask, common methods for implementing authentication include session-based authentication and token-based authentication.*
+
+#### Session-Based Authentication
+
+```python
+from flask import Flask, request, jsonify, session
+
+app = Flask(__name__)
+app.secret_key = "my_secret_key"
+
+sample_users = {
+    f"user_{i}":f"password_{i}" for i in range(10)
+}
+
+@app.route("/login", methods=["POST"])
+def login():
+    """
+    {
+        "username": "user_1",
+        "password": "password_1",
+    }
+    """
+    if request.method != 'POST':
+        return jsonify({
+            "message":"Failed, Only post request allowed"
+        })
+    data = request.json
+    if sample_users[data.get("username")] == data.get("password"):
+        session['username'] = data.get("username")
+        return jsonify({
+            "message":"login successful"
+        })
+    else:
+        return jsonify({
+            "message":"login failed"
+        })
+
+@app.route("/logout")
+def logout():
+    session.pop('username',None)
+    return jsonify({
+            "message":"logout successful"
+    })
+
+@app.route("/")
+def home():
+    if 'username' in session:
+        return f"<h1>Welcome {session['username']}</h1>"
+    else:
+        return jsonify({
+            "message":"Please login"
+        })
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+#### Token-Based Authentication
+```python
+from flask import Flask, request, jsonify
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from datetime import timedelta
+
+app = Flask(__name__)
+app.config["JWT_SECRET_KEY"] ='jwt_secret_key'
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=1)
+
+jwt = JWTManager(app)
+
+sample_users = {
+    f"user_{i}":f"password_{i}" for i in range(10)
+}
+
+
+
+@app.route("/login", methods=["POST"])
+def login():
+    """
+    {
+        "username": "user_1",
+        "password": "password_1",
+    }
+    """
+    if request.method != 'POST':
+        return jsonify({
+            "message":"Failed, Only post request allowed"
+        })
+    data = request.json
+    if sample_users[data.get("username")] == data.get("password"):
+        access_token = create_access_token(identity=data.get("username"))
+        return jsonify({'access_token': access_token})
+    else:
+        return jsonify({
+            "message":"login failed"
+        })
+
+@app.route("/")
+@jwt_required()
+def home():
+    current_user = get_jwt_identity()
+    if current_user:
+        return f"<h1>Welcome {current_user}</h1>"
+    else:
+        return jsonify({
+            "message":"Please login"
+        })
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+## Authorization
+
+*Authorization involves determining what actions a user is allowed to perform within an application. Flask provides various ways to implement authorization, often involving user roles and permissions.*
+
+### Role-Based Authorization
+
+```python
+from flask import Flask, request, jsonify
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
+from datetime import timedelta
+
+app = Flask(__name__)
+app.secret_key = "secret_key"
+app.config["JWT_SECRET_KEY"] = "jwt_secret_key"
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=1)
+
+jwt = JWTManager(app)
+
+sample_users = {
+    f"user_{i}":f"password_{i}" for i in range(10)
+}
+
+sample_role = {
+    f"user_{i}": "admin" for i in range(0,10,2)
+}
+
+@app.route("/login",methods=["POST"])
+def login():
+    data = request.json
+    if sample_users[data.get("username")] == data.get("password"):
+        access_token = create_access_token(identity=data.get("username"))
+        return jsonify({'access_token': access_token})
+    else:
+        return jsonify({
+            "message":"login failed"
+        })
+
+@app.route("/", methods=["GET"])
+@jwt_required()
+def home():
+    user = get_jwt_identity()
+    if user:
+        return f"<h1>Welcome {user}</h1>"
+    else:
+        return jsonify({
+            "message":"Please login"
+        })
+
+@app.route("/update", methods=["GET"])
+@jwt_required()
+def update():
+    user = get_jwt_identity()
+    if sample_role.get(user) == 'admin':
+        return jsonify({
+            "message": f"Welcome admin {user}"
+        })
+    else:
+        return jsonify({
+            "message": f"You are not admin! {user}"
+        })
+
+if __name__ == '__main__':
+    app.run(debug=True)
+```
+
+### Access-Based Authorization
+
+```python
+from flask import Flask, request, jsonify
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
+from datetime import timedelta
+
+app = Flask(__name__)
+app.secret_key = "secret_key"
+app.config["JWT_SECRET_KEY"] = "jwt_secret_key"
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=1)
+
+jwt = JWTManager(app)
+
+sample_users = {
+    f"user_{i}":f"password_{i}" for i in range(10)
+}
+
+sample_access = {
+    f"user_{i}": "write" for i in range(0,10,2)
+}
+
+@app.route("/login",methods=["POST"])
+def login():
+    data = request.json
+    if sample_users[data.get("username")] == data.get("password"):
+        access_token = create_access_token(identity=data.get("username"))
+        return jsonify({'access_token': access_token})
+    else:
+        return jsonify({
+            "message":"login failed"
+        })
+
+@app.route("/", methods=["GET"])
+@jwt_required()
+def home():
+    user = get_jwt_identity()
+    if user:
+        return f"<h1>Welcome {user}</h1>"
+    else:
+        return jsonify({
+            "message":"Please login"
+        })
+
+@app.route("/update", methods=["GET"])
+@jwt_required()
+def update():
+    user = get_jwt_identity()
+    if sample_access.get(user) == 'write':
+        return jsonify({
+            "message": f"Welcome {user}, have write permission"
+        })
+    else:
+        return jsonify({
+            "message": f"{user}, does not have write permission"
+        })
 
 if __name__ == '__main__':
     app.run(debug=True)
